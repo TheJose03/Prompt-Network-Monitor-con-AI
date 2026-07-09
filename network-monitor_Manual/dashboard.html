@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Prompt Network Monitor Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="author" content="TheJose03" />
+    <style>
+        :root {
+            --bg: #050816;
+            --bg-card: #0f172a;
+            --bg-soft: #020617;
+            --accent: #38bdf8;
+            --accent-soft: rgba(56, 189, 248, 0.1);
+            --danger: #f97373;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --border: #1f2937;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top, #1d4ed8 0, #020617 55%, #000 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+            overflow-x: hidden;
+        }
+        .layout {
+            width: 100%;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding-inline: 8px;
+        }
+        header {
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 16px;
+            width: 100%;
+        }
+        .header-main {
+            flex: 1;
+            min-width: 280px;
+        }
+        .author-badge {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(59, 130, 246, 0.03) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 12px;
+            padding: 10px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(8px);
+        }
+        .author-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+        }
+        .author-name {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--accent);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+        }
+        .author-name:hover {
+            color: #fff;
+            text-shadow: 0 0 15px var(--accent);
+        }
+        .license-notice {
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.72rem;
+            line-height: 1.4;
+            max-width: 900px;
+        }
+        .license-icon {
+            font-size: 1rem;
+        }
+        .license-text {
+            color: var(--muted);
+        }
+        .license-text strong {
+            color: var(--text);
+        }
+        .license-link {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px dashed var(--accent);
+            font-weight: 600;
+        }
+        .license-link:hover {
+            color: #fff;
+            border-bottom-style: solid;
+        }
+        .title {
+            font-size: 1.9rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .title-pill {
+            padding: 2px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--accent-soft);
+            background: linear-gradient(90deg, rgba(56,189,248,0.15), rgba(129,140,248,0.02));
+            font-size: .75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+        }
+        .subtitle {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 16px;
+        }
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .card {
+            background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(15,23,42,0.85));
+            border-radius: 16px;
+            border: 1px solid rgba(148,163,184,0.18);
+            box-shadow: 0 22px 50px rgba(15,23,42,0.9);
+            padding: 16px 18px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 12px;
+        }
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #d1d5db;
+        }
+        .badge {
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border: 1px solid rgba(148,163,184,0.35);
+            color: var(--muted);
+        }
+        .badge-accent {
+            border-color: rgba(56,189,248,0.6);
+            background: rgba(15,23,42,0.9);
+            color: var(--accent);
+        }
+        .badge-danger {
+            border-color: rgba(248,113,113,0.6);
+            background: rgba(127,29,29,0.3);
+            color: var(--danger);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        thead {
+            background: radial-gradient(circle at top, rgba(148,163,184,0.12), transparent 55%);
+        }
+        th, td {
+            padding: 6px 8px;
+            border-bottom: 1px solid rgba(31,41,55,0.9);
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            font-size: 0.72rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        tbody tr:nth-child(even) {
+            background: rgba(15,23,42,0.72);
+        }
+        tbody tr:hover {
+            background: rgba(30,64,175,0.55);
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            border: 1px solid rgba(148,163,184,0.4);
+            padding: 0 8px;
+            font-size: 0.7rem;
+        }
+        .pill-success {
+            border-color: rgba(52,211,153,0.7);
+            color: #6ee7b7;
+        }
+        .pill-warning {
+            border-color: rgba(250,204,21,0.7);
+            color: #facc15;
+        }
+        .pill-danger {
+            border-color: rgba(248,113,113,0.8);
+            color: var(--danger);
+        }
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.75rem;
+        }
+        .mono-wrap {
+            word-break: break-all;
+            white-space: normal;
+        }
+        .list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .chip {
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: rgba(15,23,42,0.9);
+            border: 1px solid rgba(148,163,184,0.4);
+            font-size: 0.74rem;
+        }
+        .chip-muted { color: var(--muted); }
+        .empty {
+            font-size: 0.78rem;
+            color: var(--muted);
+            padding: 4px 0 2px;
+        }
+        footer {
+            margin-top: 18px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-align: right;
+        }
+        .console-card {
+            background: radial-gradient(circle at top left, rgba(56,189,248,0.10), rgba(15,23,42,0.96));
+            border-radius: 16px;
+            border: 1px solid rgba(56,189,248,0.45);
+            box-shadow: 0 22px 45px rgba(15,23,42,0.9);
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .console-title {
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #e5e7eb;
+        }
+        .console-btn {
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(56,189,248,0.8);
+            background: linear-gradient(90deg, rgba(56,189,248,0.22), rgba(59,130,246,0.25));
+            color: #e5e7eb;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .console-btn:hover {
+            filter: brightness(1.08);
+        }
+        .console-body {
+            background: rgba(3,7,18,0.9);
+            border-radius: 10px;
+            border: 1px solid rgba(15,23,42,0.9);
+            padding: 10px 12px;
+            min-height: 260px;
+            max-height: 600px;
+            overflow-y: auto;
+            overflow-x: auto; /* scroll lateral solo dentro de esta sección */
+            resize: vertical; /* permite redimensionar solo verticalmente */
+        }
+        .console-pre {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.74rem;
+            white-space: pre;     /* mantener líneas completas */
+            word-break: normal;   /* no forzar cortes dentro de las rutas */
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <header>
+        <div class="header-top">
+            <div class="header-main">
+                <div class="title">
+                    Prompt Network Monitor Dashboard con IA
+                    <span class="title-pill"> MINI EDR / NDR View</span>
+                </div>
+                <p class="subtitle">
+                    Visualización en tiempo real de conexiones salientes, listas negras / blancas y destinos desconocidos.
+                    Mantén abierto este dashboard mientras el monitor está ejecutándose.
+                </p>
+            </div>
+            <div class="author-badge">
+                <span class="author-label">Creado por</span>
+                <a href="https://github.com/TheJose03" target="_blank" class="author-name">TheJose03</a>
+            </div>
+        </div>
+
+        <div class="license-notice">
+            <span class="license-icon">⚖️</span>
+            <p class="license-text">
+                <strong>Licencia de Uso:</strong> Se da permiso gratuito a cualquier persona física para usar, copiar y modificar este software, siempre y cuando <strong>no se remuevan</strong> los nombres (<strong>TheJose03</strong>), los enlaces de GitHub y la licencia de uso. Ver <a href="https://github.com/TheJose03/Prompt-Network-Monitor-con-AI/blob/main/LICENSE" target="_blank" class="license-link">Licencia Oficial</a>.
+            </p>
+        </div>
+
+        <div style="margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap;">
+            <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 8px 12px;">
+                <span style="color: #38bdf8; font-size: 0.75rem; font-weight: 600;">DETECCIÓN:</span>
+                <span style="color: #e5e7eb; font-size: 0.7rem; margin-left: 6px;">100ms (0.1s)</span>
+            </div>
+            <div style="background: rgba(15,23,42,0.6); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 8px 12px;">
+                <span style="color: #38bdf8; font-size: 0.75rem; font-weight: 600;">REFRESH DASHBOARD:</span>
+                <span style="color: #e5e7eb; font-size: 0.7rem; margin-left: 6px;">5s</span>
+            </div>
+            <div id="update-status" style="background: rgba(15,23,42,0.6); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 8px 12px;">
+                <span style="color: #38bdf8; font-size: 0.75rem; font-weight: 600;">ÚLTIMA ACTUALIZACIÓN:</span>
+                <span id="last-update-time" style="color: #e5e7eb; font-size: 0.7rem; margin-left: 6px;">Verificando...</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="console-card">
+            <div class="console-header">
+                <span class="console-title">SESIONES DE MONITOREO (LA MÁS RECIENTE ARRIBA)</span>
+            </div>
+            <div class="console-body">
+                {{if .Sessions}}
+                    {{range $idx, $sess := .Sessions}}
+                        <div style="margin-bottom:10px; border-bottom:4px solid rgba(56,189,248,0.6); padding-bottom:8px;">
+                            <div class="console-header" style="margin-bottom:4px;">
+                                <span class="console-title" style="font-size:0.7rem; letter-spacing:0.08em; color: #38bdf8;">SESIÓN {{$idx}}</span>
+                                <button class="console-btn" type="button" onclick="copyRawLog('raw-log-{{$idx}}', this)">Copiar sesión</button>
+                            </div>
+                            <pre id="raw-log-{{$idx}}" class="console-pre">{{$sess}}</pre>
+                        </div>
+                    {{end}}
+                {{else}}
+                    <p class="empty">Aún no hay contenido en <span class="mono">log_conexiones.txt</span>.</p>
+                {{end}}
+            </div>
+        </div>
+
+    <div class="grid">
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Conexiones Registradas</h2>
+                <span class="badge badge-accent">Log JSON</span>
+            </div>
+            {{if .Connections}}
+            <div style="max-height: 420px; overflow: auto; border-radius: 10px; border: 1px solid rgba(15,23,42,0.9);">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Fecha / Hora</th>
+                        <th>Proceso</th>
+                        <th>IP Remota</th>
+                        <th>Ruta Ejecutable</th>
+                        <th>Ubicación</th>
+                        <th>Estado</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {{range .Connections}}
+                        <tr>
+                            <td class="mono">{{.Tiempo}}</td>
+                            <td>{{.Proceso}}</td>
+                            <td class="mono">{{.IP}}</td>
+                            <td class="mono mono-wrap">{{.Ruta}}</td>
+                            <td class="mono-wrap">{{.Geo}}</td>
+                            <td>
+                                {{if eq .Estado "Desconocida"}}
+                                    <span class="pill pill-warning">Desconocida</span>
+                                {{else if or (eq .Estado "Bloqueada") (eq .Estado "Lista Negra")}}
+                                    <span class="pill pill-danger">Lista Negra</span>
+                                {{else if eq .Estado "Lista Blanca"}}
+                                    <span class="pill pill-success">Lista Blanca</span>
+                                {{else}}
+                                    <span class="pill">{{.Estado}}</span>
+                                {{end}}
+                            </td>
+                        </tr>
+                    {{end}}
+                    </tbody>
+                </table>
+            </div>
+            {{else}}
+                <p class="empty">Todavía no hay registros en <span class="mono">logs/log_conexiones.json</span>.</p>
+            {{end}}
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Listas de Control</h2>
+                <span class="badge">TXT / Config</span>
+            </div>
+
+            <h3 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:.1em; color:#e5e7eb; margin-bottom:4px;">Lista Negra</h3>
+            {{if .Blacklist}}
+                <div style="max-height:140px; overflow:auto; margin-bottom:10px;">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>Proceso</th>
+                            <th>Organización</th>
+                            <th>Motivo</th>
+                            <th>Efectos</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {{range .Blacklist}}
+                            <tr>
+                                <td class="mono">{{.IP}}</td>
+                                <td>{{.Process}}</td>
+                                <td>{{.Organization}}</td>
+                                <td>{{.Reason}}</td>
+                                <td>{{.Effects}}</td>
+                            </tr>
+                        {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            {{else}}
+                <p class="empty">No hay entradas en <span class="mono">blacklist.txt</span>.</p>
+            {{end}}
+
+            <h3 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:.1em; color:#e5e7eb; margin:6px 0 4px;">Lista Blanca</h3>
+            {{if .Whitelist}}
+                <div class="list" style="margin-bottom:4px;">
+                    {{range .Whitelist}}
+                        <span class="chip mono chip-muted">{{.}}</span>
+                    {{end}}
+                </div>
+            {{else}}
+                <p class="empty">No hay IPs en <span class="mono">whitelist.txt</span>.</p>
+            {{end}}
+
+            <h3 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:.1em; color:#e5e7eb; margin:10px 0 4px;">Desconocidas</h3>
+            {{if .UnknownIPs}}
+                <div class="list">
+                    {{range .UnknownIPs}}
+                        <span class="chip mono">{{.}}</span>
+                    {{end}}
+                </div>
+            {{else}}
+                <p class="empty">Sin registros en <span class="mono">logs/desconocidas.txt</span>.</p>
+            {{end}}
+        </section>
+    </div>
+
+    <footer>
+        Datos leídos desde la carpeta del ejecutable (logs, blacklist.txt, whitelist.txt).<br/>
+        Asegúrate de ejecutar el monitor como administrador y mantener este dashboard abierto.<br/>
+        Creado por <a href="https://github.com/TheJose03" target="_blank" style="color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent); padding-bottom: 1px;">TheJose03</a>
+    </footer>
+</div>
+<script>
+    function copyRawLog(id, btn) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var text = el.innerText || el.textContent || '';
+        if (!navigator.clipboard) {
+            var textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(textarea);
+        } else {
+            navigator.clipboard.writeText(text).catch(function(){});
+        }
+        // Feedback visual: cambiar texto del botón temporalmente
+        if (btn) {
+            var original = btn.textContent;
+            btn.textContent = 'Copiado al portapapeles';
+            btn.disabled = true;
+            setTimeout(function() {
+                btn.textContent = original;
+                btn.disabled = false;
+            }, 1500);
+        }
+    }
+
+    // Auto-refresco: solo recargar si /last-update indica cambios nuevos
+    (function(){
+        var lastUpdateTs = 0;
+        var initialized = false;
+
+        function formatTimeAgo(timestamp) {
+            var now = Math.floor(Date.now() / 1000);
+            var diff = now - timestamp;
+            
+            if (diff < 60) return 'Hace ' + diff + 's';
+            if (diff < 3600) return 'Hace ' + Math.floor(diff / 60) + 'min';
+            if (diff < 86400) return 'Hace ' + Math.floor(diff / 3600) + 'h';
+            return 'Hace ' + Math.floor(diff / 86400) + 'd';
+        }
+
+        function updateLastUpdateTime(timestamp) {
+            var element = document.getElementById('last-update-time');
+            if (element) {
+                if (timestamp === 0) {
+                    element.textContent = 'Sin datos';
+                } else {
+                    element.textContent = formatTimeAgo(timestamp);
+                }
+            }
+        }
+
+        async function checkUpdates() {
+            try {
+                var resp = await fetch('/last-update', { cache: 'no-store' });
+                if (!resp.ok) return;
+                var data = await resp.json();
+                var ts = data && data.lastUpdate ? data.lastUpdate : 0;
+                
+                // Actualizar visualización del tiempo
+                updateLastUpdateTime(ts);
+                
+                if (!initialized) {
+                    lastUpdateTs = ts;
+                    initialized = true;
+                    return;
+                }
+                if (ts > lastUpdateTs) {
+                    lastUpdateTs = ts;
+                    location.reload();
+                }
+            } catch (e) {
+                // ignorar errores de red
+            }
+        }
+
+        // Actualizar el tiempo mostrado cada segundo
+        setInterval(function() {
+            if (initialized && lastUpdateTs > 0) {
+                updateLastUpdateTime(lastUpdateTs);
+            }
+        }, 1000);
+
+        checkUpdates();
+        setInterval(checkUpdates, 5000);
+    })();
+</script>
+</body>
+</html>

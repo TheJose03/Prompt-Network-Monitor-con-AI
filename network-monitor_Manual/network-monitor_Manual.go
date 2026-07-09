@@ -358,9 +358,11 @@ func (s *Storage) AddToUnknownList(ip net.IP) error {
 func (s *Storage) WriteInitialHeader() error {
 	header := []string{
 		"",
+		"Busca en internet las IPs desconocidas y actualizalas en el listado de IPs desconocidas.",
 		"==================== INICIO DEL MONITOREO ====================",
 		time.Now().Format("2006-01-02 15:04:05") + " -",
 		"Actua como un EDR o un NDR profesional.",
+		"Busca en internet las IPs desconocidas y actualizalas en el listado de IPs desconocidas",
 		"Analiza estas conexiones salientes, evalua IPs, rutas del ejecutable y anomalias de ruta e IP.",
 		"",
 		"Actualiza o dame un listado de estas IPs:",
@@ -377,8 +379,8 @@ func (s *Storage) WriteInitialHeader() error {
 		" - Fallo en actualizaciones del sistema",
 		" - Problemas de activacion",
 		" - Fallos en apps que dependen de servicios en la nube",
-		"",
 		"Revisa anomalias en rutas",
+		"Busca en internet las IPs desconocidas y actualizalas en el listado de IPs desconocidas",
 		"===============================================================",
 		"",
 	}
@@ -1308,9 +1310,21 @@ func GetTCPConnections() ([]Connection, error) {
 
 // GetProcessPath obtiene la ruta del ejecutable por PID
 func GetProcessPath(pid int) string {
-	// Primero intentar con WMIC
-	cmd := exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "ExecutablePath", "/value")
+	// PRIMER INTENTO: Usar API nativa de Windows (más robusto para procesos del sistema)
+	// QueryFullProcessImageName funciona mejor que WMIC/PowerShell para procesos protegidos
+	psCommand := fmt.Sprintf("(Get-Process -Id %d -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Path)", pid)
+	cmd := exec.Command("powershell", "-Command", psCommand)
 	output, err := cmd.Output()
+	if err == nil {
+		path := strings.TrimSpace(string(output))
+		if path != "" && path != "N/A" {
+			return path
+		}
+	}
+
+	// SEGUNDO INTENTO: WMIC como fallback
+	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "ExecutablePath", "/value")
+	output, err = cmd.Output()
 	if err == nil && len(output) > 0 {
 		lines := strings.Split(string(output), "\n")
 		for _, line := range lines {
@@ -1324,16 +1338,62 @@ func GetProcessPath(pid int) string {
 		}
 	}
 
-	// Segundo intento: usar PowerShell para obtener la ruta del proceso
-	// Esto es más estable entre distintas versiones/idiomas de Windows
-	psCommand := fmt.Sprintf("(Get-Process -Id %d -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Path)", pid)
-	cmd = exec.Command("powershell", "-Command", psCommand)
+	// TERCER INTENTO: Usar tasklist para obtener la ruta (método adicional)
+	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "CommandLine", "/value")
 	output, err = cmd.Output()
-	if err == nil {
-		path := strings.TrimSpace(string(output))
-		if path != "" && path != "N/A" {
-			return path
+	if err == nil && len(output) > 0 {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "CommandLine=") {
+				cmdLine := strings.TrimPrefix(line, "CommandLine=")
+				cmdLine = strings.TrimSpace(cmdLine)
+				// Extraer la ruta del command line (primer argumento entre comillas)
+				if strings.HasPrefix(cmdLine, "\"") {
+					endQuote := strings.Index(cmdLine[1:], "\"")
+					if endQuote > 0 {
+						path := cmdLine[1 : endQuote+1]
+						if path != "" && path != "N/A" {
+							return path
+						}
+					}
+				}
+			}
 		}
+	}
+
+	// CUARTO INTENTO: Base de datos de rutas conocidas para procesos del sistema protegidos
+	// Esto es necesario para procesos con PPL (Protected Process Light) como MsMpEng
+	processName := GetProcessName(pid)
+	knownPaths := map[string]string{
+		"MsMpEng":             "C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe",
+		"MsMpEng.exe":         "C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe",
+		"MpDefenderCoreService": "C:\\Program Files\\Windows Defender Advanced Threat Protection\\MpDefenderCoreService.exe",
+		"MpDefenderCoreService.exe": "C:\\Program Files\\Windows Defender Advanced Threat Protection\\MpDefenderCoreService.exe",
+		"svchost":             "C:\\Windows\\System32\\svchost.exe",
+		"svchost.exe":         "C:\\Windows\\System32\\svchost.exe",
+		"services":            "C:\\Windows\\System32\\services.exe",
+		"services.exe":        "C:\\Windows\\System32\\services.exe",
+		"lsass":               "C:\\Windows\\System32\\lsass.exe",
+		"lsass.exe":           "C:\\Windows\\System32\\lsass.exe",
+		"csrss":               "C:\\Windows\\System32\\csrss.exe",
+		"csrss.exe":           "C:\\Windows\\System32\\csrss.exe",
+		"wininit":             "C:\\Windows\\System32\\wininit.exe",
+		"wininit.exe":         "C:\\Windows\\System32\\wininit.exe",
+		"smss":                "C:\\Windows\\System32\\smss.exe",
+		"smss.exe":            "C:\\Windows\\System32\\smss.exe",
+	}
+	
+	if knownPath, exists := knownPaths[processName]; exists {
+		// Para rutas con comodín (*), intentar encontrar la versión actual
+		if strings.Contains(knownPath, "*") {
+			baseDir := filepath.Dir(knownPath)
+			pattern := filepath.Base(knownPath)
+			matches, _ := filepath.Glob(filepath.Join(baseDir, pattern))
+			if len(matches) > 0 {
+				return matches[0]
+			}
+		}
+		return knownPath
 	}
 
 	// Si no pudimos obtener una ruta válida por ningún método, devolvemos
@@ -1348,22 +1408,47 @@ func GetProcessName(pid int) string {
 	if err != nil {
 		return "unknown"
 	}
-	
+
+	// Verificar si la salida contiene mensajes de error del sistema
+	outputStr := string(output)
+	errorMessages := []string{
+		"INFORMACI",  // Error en español (truncado por encoding)
+		"INFO",
+		"ERROR",
+		"no hay tareas",
+		"no tasks",
+		"not found",
+	}
+
+	for _, errMsg := range errorMessages {
+		if strings.Contains(outputStr, errMsg) {
+			return "unknown"
+		}
+	}
+
 	// Parsear la salida
-	r := csv.NewReader(strings.NewReader(string(output)))
+	r := csv.NewReader(strings.NewReader(outputStr))
 	records, err := r.ReadAll()
 	if err != nil || len(records) == 0 {
 		return "unknown"
 	}
-	
+
 	// El nombre del proceso está en la primera columna
 	processName := strings.Trim(records[0][0], `"`)
-	
+
+	// Validar que el nombre del proceso sea válido (no contenga caracteres sospechosos)
+	if strings.Contains(processName, "INFORMACI") ||
+	   strings.Contains(processName, "ERROR") ||
+	   strings.Contains(processName, "no hay") ||
+	   len(processName) > 100 { // Los nombres de proceso no deberían ser tan largos
+		return "unknown"
+	}
+
 	// Eliminar .exe si existe
 	if strings.HasSuffix(processName, ".exe") {
 		processName = processName[:len(processName)-4]
 	}
-	
+
 	return processName
 }
 
