@@ -299,3 +299,9 @@ ticker := time.NewTicker(100 * time.Millisecond) // 100ms de detección
    ```
 
 ⚠️ **Nota:** Mayor valor = menor uso de CPU pero detección más lenta de conexiones sospechosas.
+
+## Por estas razones no lo coloco de codigo abierto:
+
+https://www.youtube.com/watch?v=hbbXzuLOyJ0
+
+https://www.youtube.com/watch?v=alfIxtD9CKM
