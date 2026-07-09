@@ -107,7 +107,15 @@ func StartDashboardServer(storage *Storage) {
                 if p == "" {
                     continue
                 }
-                sess := marker + "\n" + p
+                // Dividir en líneas y invertir el orden para que las conexiones nuevas aparezcan arriba
+                lines := strings.Split(p, "\n")
+                // Invertir el orden de las líneas
+                for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+                    lines[i], lines[j] = lines[j], lines[i]
+                }
+                // Reconstruir la sesión con las líneas invertidas
+                invertedContent := strings.Join(lines, "\n")
+                sess := marker + "\n" + invertedContent
                 sessions = append(sessions, sess)
             }
             // Ordenar de más nueva a más vieja (último bloque al principio)
